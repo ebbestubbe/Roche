@@ -53,8 +53,8 @@ def main():
             cost = [cost_a,cost_b,cost_c,cost_d,cost_e]
             samples.append([sample_id,carried_by,rank,health,cost])
         [eprint(s) for s in samples]
-        print("GOTO SAMPLES")
-        continue
+        
+         
         #at the start, go get samples
         if(robots[0][0] == "START_POS"):
             print("GOTO DIAGNOSIS")
