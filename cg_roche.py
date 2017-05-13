@@ -35,7 +35,7 @@ def main():
             expertise = [expertise_a,expertise_b,expertise_c,expertise_d,expertise_e]
             robots.append([target,eta,score,storage,expertise])
         #eprint(robots)
-        [eprint(r) for r in robots]
+        
         available_a, available_b, available_c, available_d, available_e = [int(i) for i in input().split()]
         sample_count = int(input())
         samples = []
@@ -52,29 +52,41 @@ def main():
             cost_e = int(cost_e)
             cost = [cost_a,cost_b,cost_c,cost_d,cost_e]
             samples.append([sample_id,carried_by,rank,health,cost])
+        [eprint(r) for r in robots]
+        eprint("All samples:")
         [eprint(s) for s in samples]
         
          
         #at the start, go get samples
         if(robots[0][0] == "START_POS"):
-            print("GOTO DIAGNOSIS")
+            print("GOTO SAMPLES")
             continue
         ownedsamples = [s for s in samples if s[1]==0]
         ownedsamples.sort(key = lambda x: x[3]/sum(x[4]),reverse=True)
-
-        if(robots[0][0] == "DIAGNOSIS"):
-            #if we dont have enough samples, collect the ones with most value/molecule
-            if(len(ownedsamples)<3):
-                available = [s for s in samples if s[1] == -1]
-                
-                available.sort(key = lambda x: x[3]/sum(x[4]),reverse=True)
-                [eprint(a) for a in available]
-                print("CONNECT" ,available[0][0])
+        
+        if(robots[0][0] == "SAMPLES"):
+            #if we dont have enough samples, collect a sample
+            if(len(ownedsamples)<1):
+                print("CONNECT",2)
                 continue
             else:
-                eprint("at diagnosis, going to molecules")
+                #If we have samples, go to diagnosis
+                print("GOTO DIAGNOSIS")
+                continue
+        #We explicitly split these groups into subgroups, but there must be an easier way
+        #known_samples = [s for s in samples if s[3]!=-1]#those we own and are known
+        #known_ownedsamples = [s for s in ownedsamples if s[3]!=-1]
+        unknown_ownedsamples = [s for s in ownedsamples if s[3] == -1]
+        if(robots[0][0] == "DIAGNOSIS"):
+            #If we own samples which are unknown, identify them
+            if(len(unknown_ownedsamples)>0):
+                print("CONNECT",ownedsamples[0][0])
+                continue
+            else:
                 print("GOTO MOLECULES")
                 continue
+                
+            
         eprint("ownedsamples",ownedsamples)
         if(robots[0][0] == "MOLECULES"):
             
@@ -111,17 +123,21 @@ def main():
                     eprint(diff)
                     turnin = o[0]
                     break
+            #if we found somehting to turn in, do it
             if(turnin!=None):
                 print("CONNECT",turnin)
                 continue
+            #If we dont have anything, move on
             elif(turnin==None):
                 eprint("owned samples:",ownedsamples)
+                #If we have more samples, go to molecules and finish those
                 if(len(ownedsamples)>0):
                     eprint("at laboratory, going to molecules")
                     print("GOTO MOLECULES")
                     continue
+                #If we dont have samples, go get more samples
                 else:
-                    print("GOTO DIAGNOSIS")
+                    print("GOTO SAMPLES")
                     continue
 def eprint(*args,**kwargs):
     print(*args,file=sys.stderr,**kwargs)
