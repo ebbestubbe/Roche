@@ -69,6 +69,7 @@ def main():
         if(turn == 0):
             print("GOTO SAMPLES")
             continue
+        
         elif(turn>=2 and turn<=4):
             print("CONNECT 1")
             continue
@@ -76,16 +77,18 @@ def main():
         elif(turn==5):
             print("GOTO DIAGNOSIS")
             continue
+        else:
+            print(random.choice(moves))
+            continue
+        '''
         elif(turn>=8 and turn <=10):
             print("CONNECT",turn-8)
             continue
         elif(turn==11):
             print("GOTO MOLECULES")
             continue
-        else:
-            print(random.choice(moves))
-            continue
-        '''
+        
+        
         if(turn>=14 and turn <18):
             print("CONNECT C")
             continue
