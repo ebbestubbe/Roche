@@ -76,6 +76,13 @@ def main():
         moves = availablemoves(robots,samples)
         eprint("available moves:")
         [eprint(m) for m in moves]
+        ownedsamples = [s for s in samples if s[1]==0]
+        ownedsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
+        possible_turnin(robots,ownedsamples)
+        if(any(possible_turnin)):
+            order = getorder_turnin(robots,samples)
+            print(order)
+            continue
         ''' 
         if(turn == 0):
             print("GOTO SAMPLES")
@@ -123,7 +130,8 @@ def main():
             continue
         '''
         
-         
+        
+        '''
         #at the start, go get samples
         if(robots[0][0] == "START_POS"):
             print("GOTO SAMPLES")
@@ -214,16 +222,18 @@ def main():
                 else:
                     print("GOTO SAMPLES")
                     continue
-
+        '''
+#input: robots and any list of samples
 #Returns the list of possible sampleids we can turn in
 #Accounts for discounts
 #possible improvements:
 #Return list of list of samples we can turn in simultaniously(accounting for future discounts.)
 #(adjust to also return number of turns before this happens)
 def possible_turnin(robots,samples): 
-    ownedsamples = [s for s in samples if s[1]==0]
-    turnin = []
-    for s in ownedsamples:
+    #ownedsamples = [s for s in samples if s[1]==0]
+    turnin = []   
+    #for s in ownedsamples:
+    for s in samples:    
         needed = np.maximum(s[5] - robots[0][3] - robots[0][4],0)
         if(all(n==0 for n in needed)):
             turnin.append(s[0])
@@ -254,7 +264,11 @@ def immediately_collectable(robots,ownedsamples):
             #eprint("there are enough molecules in stock for ",ownedsamples[j])
             possible[j] = True
     return neededmatrix, possible
-                
+
+#returns the order needed to turn in a sample
+def getorder_turnin(robots,samples):
+    
+    
 def availablemoves(robots,samples):
     moves = []
     if(robots[0][1] > 0):
