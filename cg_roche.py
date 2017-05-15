@@ -3,6 +3,7 @@ import math
 import numpy as np
 import random
 from operator import add
+from collections import Counter
 
 #Notes:
     #If the enemy moves to laboratory, he has enough to turn in his samples
@@ -80,7 +81,7 @@ def main():
         ownedsamples = [s for s in samples if s[1]==0]
         ownedsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
         
-        ownedunknownsamples = [s for s in samples if s[4]==-1]
+        ownedunknownsamples = [s for s in ownedsamples if s[4]==-1]
         
         cloudsamples = [s for s in samples if s[1]==-1]
         cloudsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
@@ -93,11 +94,12 @@ def main():
             order = getorder_turnin(robots,turnin[0])
             print(order)
             continue
-        if(len(ownedunknownsamples)>0):
-            order = getorder_diagnosenew(robots,samples)
+        
+        if(robots[0][0] == 'DIAGNOSIS' and len(ownedunknownsamples)>0):
+            #eprint("unknown:",ownedunknownsamples)
+            order = getorder_diagnoseall(robots,samples)
             print(order)
             continue
-        
         #If we can assemble a sample we own, do it
         neededmatrix, possible_assemble_owned = immediately_collectable(robots,samples,ownedsamples)
         if(any(possible_assemble_owned)):
@@ -108,20 +110,14 @@ def main():
         
         #if we have undiagnosed samples, diagnose them
         #getorder_diagnosenew(robots,samples)
-        '''     
-        #if we can get a sample which we can assemble, do that
-        neededmatrix,possible_assemble_cloud = immediately_collectable(robots,samples,cloudsamples)
-        if(any(possible_assemble_cloud)):
-            to_get = cloudsamples[possible_assemble_cloud.index(True)]
-            order = getorder_getfromcloud(robots,samples,to_get)
-            #order = getorder_assemble(robots,samples,to_assemble)
-            print(order)
-            continue
-        '''
+        
         #If neither of these work, discard diagnose new samples
-        order = getorder_diagnosenew(robots,samples)
+        #order = getorder_diagnosenew(robots,samples)
+        order = getorder_newsamples(robots,samples)
+        order = getorder_cyclesamples(robots,samples)
         print(order)
         continue
+
 #input: robots and samples. candidate_samples are the samples we wish to check for
 #Returns the list of possible sampleids we can turn in
 #Accounts for discounts
@@ -221,21 +217,57 @@ def getorder_diagnosenew(robots,samples):
             order = "GOTO SAMPLES"
     elif(robots[0][0] == "SAMPLES"):
         if(len(ownedsamples)<3):
-            order = "CONNECT 2"
+            order = "CONNECT 1"
+            if(np.sum(robots[0][4])>3):
+                order = "CONNECT 2"
+            if(np.sum(robots[0][4])>5):
+                order = "CONNECT 3"
         else:
             order = "GOTO DIAGNOSIS"
           
     return order
-'''
-def getorder_getfromcloud(robots,samples,to_get):
-    ownedsamples = [s for s in ]
+def getorder_diagnoseall(robots,samples):
+    ownedunknownsamples = [s for s in samples if s[4] == -1 and s[1] == 0]
     if(robots[0][0] != "DIAGNOSIS"):
-        order = "GOTO DIAGNOSIS"
-
+        order = "GOTO DIAGNOSIS" #identify
     if(robots[0][0] == "DIAGNOSIS"):
-        if(len())
+        order = "CONNECT " + str(ownedunknownsamples[0][0])
     return order
-'''
+def getorder_newsamples(robots,samples):
+    
+    if (robots[0][0] != "SAMPLES"):
+        order = "GOTO SAMPLES"
+    else:
+        #desired: the desired ranks 
+        currentranks = Counter([s[2] for s in samples if s[1] == 0])
+        eprint("currentranks",currentranks)
+        if(np.sum(robots[0][4])<2):
+            desired = [1,1,1]
+        elif(np.sum(robots[0][4])<4 and np.sum(robots[0][4])>=2):
+            desired = [1,1,2]
+        elif(np.sum(robots[0][4])<6 and np.sum(robots[0][4])>=4):
+            desired = [1,2,2]
+        elif(np.sum(robots[0][4])<8 and np.sum(robots[0][4])>=6):
+            desired = [1,2,3]
+        else:#(np.sum(robots[0][4])>=8):
+            desired = [2,2,3]
+        desired = Counter(desired)
+        eprint("desired",desired)
+        to_order = list((desired-currentranks).elements())
+        eprint("to_order",to_order)
+        
+        eprint("to_order",to_order)
+        order = "CONNECT " + str(to_order[0])
+    return order
+def getorder_cyclesamples(robots,samples):
+    ownedsamples = [s for s in samples if s[1] == 0]
+    ownedunknownsamples = [s for s in samples if s[4] == -1 and s[1] == 0]
+    if(robots[0][0] == "SAMPLES"):
+        if(len(ownedsamples) < 3):
+            order = getorder_newsamples(robots,samples)
+    if(robots[])
+    return order
+
 def availablemoves(robots,samples):
     moves = []
     if(robots[0][1] > 0):
