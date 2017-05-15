@@ -80,6 +80,8 @@ def main():
         ownedsamples = [s for s in samples if s[1]==0]
         ownedsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
         
+        ownedunknownsamples = [s for s in samples if s[4]==-1]
+        
         cloudsamples = [s for s in samples if s[1]==-1]
         cloudsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
         
@@ -89,6 +91,10 @@ def main():
         if(turnin):
             eprint(turnin)
             order = getorder_turnin(robots,turnin[0])
+            print(order)
+            continue
+        if(len(ownedunknownsamples)>0):
+            order = getorder_diagnosenew(robots,samples)
             print(order)
             continue
         
@@ -215,7 +221,7 @@ def getorder_diagnosenew(robots,samples):
             order = "GOTO SAMPLES"
     elif(robots[0][0] == "SAMPLES"):
         if(len(ownedsamples)<3):
-            order = "CONNECT 1"
+            order = "CONNECT 2"
         else:
             order = "GOTO DIAGNOSIS"
           
