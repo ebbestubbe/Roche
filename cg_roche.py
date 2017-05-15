@@ -68,188 +68,85 @@ def main():
             cost_e = int(cost_e)
             cost = np.array([cost_a,cost_b,cost_c,cost_d,cost_e])
             samples.append([sample_id,carried_by,rank,expertise_gain,health,cost])
+
         eprint("TURN",turn)
         [eprint(r) for r in robots]
         eprint("All samples:")
-        [eprint(s) for s in samples]
+        [eprint(s) for s in samples]        
+        #moves = availablemoves(robots,samples)
+        #eprint("available moves:")
+        #[eprint(m) for m in moves]
         
-        moves = availablemoves(robots,samples)
-        eprint("available moves:")
-        [eprint(m) for m in moves]
         ownedsamples = [s for s in samples if s[1]==0]
         ownedsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
-        possible_turnin(robots,ownedsamples)
-        if(any(possible_turnin)):
-            order = getorder_turnin(robots,samples)
+        
+        cloudsamples = [s for s in samples if s[1]==-1]
+        cloudsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
+        
+        turnin = possible_turnin(robots,samples,ownedsamples)
+        
+        #If we can turn anything in, turn in the first possible one
+        if(turnin):
+            eprint(turnin)
+            order = getorder_turnin(robots,turnin[0])
             print(order)
             continue
-        ''' 
-        if(turn == 0):
-            print("GOTO SAMPLES")
+        
+        #If we can assemble a sample we own, do it
+        neededmatrix, possible_assemble_owned = immediately_collectable(robots,samples,ownedsamples)
+        if(any(possible_assemble_owned)):
+            to_assemble = ownedsamples[possible_assemble_owned.index(True)]
+            order = getorder_assemble(robots,samples,to_assemble)
+            print(order)
             continue
         
-        elif(turn>=2 and turn<=4):
-            print("CONNECT 1")
-            continue
-        
-        elif(turn==5):
-            print("GOTO DIAGNOSIS")
-            continue
-        else:
-            print(random.choice(moves))
-            continue
-        
-        elif(turn>=8 and turn <=10):
-            print("CONNECT",turn-8)
-            continue
-        elif(turn==11):
-            print("GOTO MOLECULES")
-            continue
-        
-        
-        if(turn>=14 and turn <18):
-            print("CONNECT C")
-            continue
-        if(turn==18):
-            print("GOTO LABORATORY")
-            continue
-        if(turn==21):
-            print("CONNECT 0")
-            continue
-        if(turn==22):
-            print("GOTO MOLECULES")
-            continue
-        if(turn>=25 and turn <27):
-            print("CONNECT E")
-            continue
-        if(turn==27):
-            print("GOTO LABORATORY")
-            continue
-        if(turn==30):
-            print("CONNECT 2")
+        #if we have undiagnosed samples, diagnose them
+        #getorder_diagnosenew(robots,samples)
+        '''     
+        #if we can get a sample which we can assemble, do that
+        neededmatrix,possible_assemble_cloud = immediately_collectable(robots,samples,cloudsamples)
+        if(any(possible_assemble_cloud)):
+            to_get = cloudsamples[possible_assemble_cloud.index(True)]
+            order = getorder_getfromcloud(robots,samples,to_get)
+            #order = getorder_assemble(robots,samples,to_assemble)
+            print(order)
             continue
         '''
-        
-        
-        '''
-        #at the start, go get samples
-        if(robots[0][0] == "START_POS"):
-            print("GOTO SAMPLES")
-            continue
-        ownedsamples = [s for s in samples if s[1]==0]
-        ownedsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
-        
-        if(robots[0][0] == "SAMPLES"):
-            #if we dont have enough samples, collect a sample
-            if(len(ownedsamples)<3):
-                if(all([s[2]!=2 for s in samples if s[1]==0])):    
-                    print("CONNECT",2)
-                    continue
-                else:
-                    print("CONNECT",1)
-                    continue
-            else:
-                #If we have samples, go to diagnosis
-                print("GOTO DIAGNOSIS")
-                continue
-        #We explicitly split these groups into subgroups, but there must be an easier way
-        #known_samples = [s for s in samples if s[3]!=-1]#those we own and are known
-        #known_ownedsamples = [s for s in ownedsamples if s[3]!=-1]
-        unknown_ownedsamples = [s for s in ownedsamples if s[4] == -1]
-        if(robots[0][0] == "DIAGNOSIS"):
-            #If we own samples which are unknown, identify them
-            if(len(unknown_ownedsamples)>0):
-                
-                print("CONNECT",unknown_ownedsamples[0][0])
-                continue
-            else:
-                print("GOTO MOLECULES")
-                continue
-                
-            
-        #eprint("ownedsamples",ownedsamples)
-        if(robots[0][0] == "MOLECULES"):
-            eprint("at molecules")
-            #If we have something to turn in: go to laboratory:
-            turnin = possible_turnin(robots,samples)
-            eprint("we can turn in",turnin)
-            if(turnin):
-                print("GOTO LABORATORY")
-                continue
-            #If we do not, assemble a sample
-            
-            
-            neededmatrix,possible = immediately_collectable(robots,ownedsamples)
-            eprint("we can assemble", possible)
-            #If any of these are possible, do them:
-            if(any(possible)):    
-                #Do the first one which is possible
-                requestmol = None
-                assemble_this = possible.index(True) #Returns the index of the first assemble-able
-                for i,m in enumerate(neededmatrix[assemble_this]):
-                    if(m>0): #fill out the molecules we need in order from A to E. Could be improved by grabbing the most critical first probably, or the ones with most overlap
-                        requestmol = itm[i]
-                        break
-                print("CONNECT ", requestmol)
-                continue
-            
-            #If none of them are possible, we should
-            #1: turn in
-            turnin = possible_turnin(robots,samples)
-            if(turnin):
-                print("GOTO LABORATORY")
-                continue
-            #2: get new samples
-                
-            
-            
-        if(robots[0][0] == "LABORATORY"):
-            #for all owned samples, check if they are doable
-            turnin = possible_turnin(robots,samples)
-            if(turnin):
-                print("CONNECT",turnin[0])
-                continue
-            #If we dont have anything, move on
-            elif(not turnin):
-                eprint("owned samples:",ownedsamples)
-                #If we have samples we can finish, do those
-                neededmatrix,possible = immediately_collectable(robots,ownedsamples)
-                if(any(possible)):
-                    eprint("at laboratory, going to molecules")
-                    print("GOTO MOLECULES")
-                    continue
-                #If we dont have samples, go get more samples
-                else:
-                    print("GOTO SAMPLES")
-                    continue
-        '''
-#input: robots and any list of samples
+        #If neither of these work, discard diagnose new samples
+        order = getorder_diagnosenew(robots,samples)
+        print(order)
+        continue
+#input: robots and samples. candidate_samples are the samples we wish to check for
 #Returns the list of possible sampleids we can turn in
 #Accounts for discounts
 #possible improvements:
 #Return list of list of samples we can turn in simultaniously(accounting for future discounts.)
 #(adjust to also return number of turns before this happens)
-def possible_turnin(robots,samples): 
-    #ownedsamples = [s for s in samples if s[1]==0]
+def possible_turnin(robots,samples,candidate_samples): 
+    diagnosed = [s for s in candidate_samples if s[4]!=-1]
+
     turnin = []   
-    #for s in ownedsamples:
-    for s in samples:    
+
+    for s in diagnosed:    
         needed = np.maximum(s[5] - robots[0][3] - robots[0][4],0)
         if(all(n==0 for n in needed)):
-            turnin.append(s[0])
+            turnin.append(s)
     return turnin
 
+#needs: robots, samples, a list of samples to search in
+#robots and samples: are always given, to make it possible to do more finely tuned decision making
+#candidate_samples: the list of samples we would like to know if we can collect immediately
 #Returns
     #neededmatrix: list of numpy arrays: for each ownedsample: the number of each type needed
     #possible: list of bools: for each ownedsample: True if the molecules are able to be collected
     
 #Does not account for molecules which can be stolen, or for molecules which are being returned.
 #Only accounts for the current number of molecules in stock
-def immediately_collectable(robots,ownedsamples):
-    
+def immediately_collectable(robots,samples,candidate_samples):
+    diagnosed = [s for s in candidate_samples if s[4] !=-1]
     #Molecules needed for each sample
     neededmatrix = []
-    for o in ownedsamples:
+    for o in diagnosed:
         needed = np.maximum(o[5] - robots[0][3] - robots[0][4],0)
         neededmatrix.append(needed)
     #neededmatrix: a row for each sample, describing what is needed
@@ -266,9 +163,73 @@ def immediately_collectable(robots,ownedsamples):
     return neededmatrix, possible
 
 #returns the order needed to turn in a sample
-def getorder_turnin(robots,samples):
+def getorder_turnin(robots,sample):
+    if(robots[0][0] != "LABORATORY"):
+        order = "GOTO LABORATORY"
+    else:
+        order = "CONNECT " + str(sample[0])
+    return order        
+            
+def getorder_assemble(robots,samples,to_assemble):
     
+    if(robots[0][0] != "MOLECULES"):
+        order = "GOTO MOLECULES"
     
+    else:
+        eprint("we can assemble", to_assemble)
+        needed = np.maximum(to_assemble[5] - robots[0][3] - robots[0][4],0)
+
+        #If any of these are possible, do them:
+        #Do the first one which is possible
+        requestmol = None
+        for i,n in enumerate(needed):
+             #fill out the molecules we need in order from A to E. Could be improved by grabbing the most critical first probably, or the ones with most overlap
+             if(n>0):
+                 requestmol = itm[i]
+                 break
+        order = "CONNECT " + str(requestmol)
+    return order
+#def getorder_getfromcloud():
+
+def getorder_diagnosenew(robots,samples):
+    ownedsamples = [s for s in samples if s[1] == 0]
+    #ownedsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
+    ownedunknownsamples = [s for s in ownedsamples if s[4] == -1]
+    #Depending on the number of samples we own, go to the different stations,
+    #If we are at either of those stations, they will be overwritten
+    if(len(ownedunknownsamples)>0):
+        order = "GOTO DIAGNOSIS" #identify
+    elif(len(ownedsamples)==3):
+        order = "GOTO DIAGNOSIS" #discard
+    else:
+        order = "GOTO SAMPLES"  
+    
+    if(robots[0][0] == "DIAGNOSIS"):
+        if(len(ownedunknownsamples)>0):
+            #Diagnose if we can
+            order = "CONNECT " + str(ownedunknownsamples[0][0])
+        elif(len(ownedsamples) > 0):
+            #Discard all
+            order = "CONNECT " + str(ownedsamples[0][0])
+        else:
+            order = "GOTO SAMPLES"
+    elif(robots[0][0] == "SAMPLES"):
+        if(len(ownedsamples)<3):
+            order = "CONNECT 1"
+        else:
+            order = "GOTO DIAGNOSIS"
+          
+    return order
+'''
+def getorder_getfromcloud(robots,samples,to_get):
+    ownedsamples = [s for s in ]
+    if(robots[0][0] != "DIAGNOSIS"):
+        order = "GOTO DIAGNOSIS"
+
+    if(robots[0][0] == "DIAGNOSIS"):
+        if(len())
+    return order
+'''
 def availablemoves(robots,samples):
     moves = []
     if(robots[0][1] > 0):
