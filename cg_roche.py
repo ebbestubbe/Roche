@@ -161,17 +161,18 @@ def main():
             
         #eprint("ownedsamples",ownedsamples)
         if(robots[0][0] == "MOLECULES"):
-            
+            eprint("at molecules")
             #If we have something to turn in: go to laboratory:
             turnin = possible_turnin(robots,samples)
+            eprint("we can turn in",turnin)
             if(turnin):
                 print("GOTO LABORATORY")
                 continue
             #If we do not, assemble a sample
             
             
-            neededmatrix,possible = immediately_collectable(robots,samples)
-            
+            neededmatrix,possible = immediately_collectable(robots,ownedsamples)
+            eprint("we can assemble", possible)
             #If any of these are possible, do them:
             if(any(possible)):    
                 #Do the first one which is possible
@@ -203,8 +204,9 @@ def main():
             #If we dont have anything, move on
             elif(not turnin):
                 eprint("owned samples:",ownedsamples)
-                #If we have more samples, go to molecules and finish those
-                if(len(ownedsamples)>0):
+                #If we have samples we can finish, do those
+                neededmatrix,possible = immediately_collectable(robots,ownedsamples)
+                if(any(possible)):
                     eprint("at laboratory, going to molecules")
                     print("GOTO MOLECULES")
                     continue
