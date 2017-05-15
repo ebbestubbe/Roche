@@ -157,7 +157,7 @@ def immediately_collectable(robots,samples,candidate_samples):
         neededmatrix.append(needed)
     #neededmatrix: a row for each sample, describing what is needed
     #[eprint(n) for n in neededmatrix]
-    stock = - robots[0][3] - robots[1][3] + 6 #Molecules left in stock(if there is a duplicate molecule, total will be 7, for -1 stock. special case handled)
+    stock = - robots[0][3] - robots[1][3] + 5 #Molecules left in stock(if there is a duplicate molecule, total will be 7, for -1 stock. special case handled)
     #eprint("stock:",stock)
     
     #Figure out which are possible to do atm:
@@ -282,9 +282,9 @@ def availablemoves(robots,samples):
         moves.append("GOTO LABORATORY")
         #Total unavailable molecules
         totalowned = robots[0][3] + robots[1][3]
-        #If we have backpackspace, we can add molecules from those where totalowned<6
+        #If we have backpackspace, we can add molecules from those where totalowned<5
         if(sum(robots[0][3])<10):
-            [moves.append("CONNECT " + str(k)) for k,v in mti.items() if totalowned[v]<6]
+            [moves.append("CONNECT " + str(k)) for k,v in mti.items() if totalowned[v]<5]
         
         return moves
         
