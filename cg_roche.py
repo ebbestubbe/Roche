@@ -1,8 +1,5 @@
 import sys
-import math
 import numpy as np
-import random
-from operator import add
 from collections import Counter
 
 #Notes:
@@ -11,6 +8,9 @@ from collections import Counter
 # Bring data on patient samples from the diagnosis machine to the laboratory with enough molecules to produce medicine!
 mti = {"A":0,"B":1,"C":2,"D":3,"E":4}
 itm = {v:k for k,v in mti.items()}
+dist = np.array([[2,2,2,2],[0,3,3,3],[3,0,3,4],[3,3,0,3],[3,4,3,0]])
+pos_dict = {"START_POS": 0,"SAMPLES":1,"DIAGNOSIS":2,"MOLECULES":3,"LABORATORY":4}
+
 def main():
 
     '''    
@@ -79,7 +79,7 @@ def main():
         #moves = availablemoves(robots,samples)
         #eprint("available moves:")
         #[eprint(m) for m in moves]
-        order = naivegreedystrategy(robots,samples)
+        order = stockupstrategy(robots,samples)
         print(order)
         continue
     
@@ -125,6 +125,12 @@ def stockupstrategy(robots,samples):
             return(order)
     #If we can assemble a sample we own, do it
     neededmatrix, possible_assemble_owned = immediately_collectable(robots,samples,ownedsamples)
+    
+    eprint("neededmatrix")
+    [eprint(n) for n in neededmatrix]
+    eprint("possible",possible_assemble_owned)
+    
+    
     if(any(possible_assemble_owned)):
         to_assemble = ownedsamples[possible_assemble_owned.index(True)]
         order = getorder_assemble(robots,samples,to_assemble)
@@ -275,10 +281,10 @@ def possible_turnin(robots,samples,candidate_samples):
 #Does not account for molecules which can be stolen, or for molecules which are being returned.
 #Only accounts for the current number of molecules in stock
 def immediately_collectable(robots,samples,candidate_samples):
-    diagnosed = [s for s in candidate_samples if s[4] !=-1]
+    #diagnosed = [s for s in candidate_samples if s[4] !=-1]
     #Molecules needed for each sample
     neededmatrix = []
-    for o in diagnosed:
+    for o in candidate_samples:
         neededmatrix.append(o[6])
     #neededmatrix: a row for each sample, describing what is needed
     #[eprint(n) for n in neededmatrix]
@@ -288,11 +294,13 @@ def immediately_collectable(robots,samples,candidate_samples):
     #Figure out which are possible to do atm:
     possible = [False]*len(neededmatrix)
     for j,n in enumerate(neededmatrix):
-        if(all(stock[i] >= n[i] for i in range(len(n))) and np.sum(n)+np.sum(robots[0][3])<=10): #if there is enough in the stock and we can carry the mols, it is possible                    
+        if(all(stock[i] >= n[i] for i in range(len(n))) and np.sum(n)+np.sum(robots[0][3])<=10 and candidate_samples[j][4]!=-1): #if there is enough in the stock and we can carry the mols, it is possible                    
             #eprint("there are enough molecules in stock for ",ownedsamples[j])
             possible[j] = True
+            
     return neededmatrix, possible
 
+    
 #returns the order needed to turn in a sample
 def getorder_turnin(robots,sample):
     if(robots[0][0] != "LABORATORY"):
