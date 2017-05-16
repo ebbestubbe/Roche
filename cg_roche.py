@@ -55,7 +55,7 @@ def main():
         
         available_a, available_b, available_c, available_d, available_e = [int(i) for i in input().split()]
         sample_count = int(input())
-        samples = [] #[0:id, 1:carriedby, 2:rank, 3:exp gain, 4:health,5:cost]
+        samples = [] #[0:id, 1:carriedby, 2:rank, 3:exp gain, 4:health,5:cost,6:needed for robot1,7:needed for robot2]
         for i in range(sample_count):
             sample_id, carried_by, rank, expertise_gain, health, cost_a, cost_b, cost_c, cost_d, cost_e = input().split()
             sample_id = int(sample_id)
@@ -68,7 +68,9 @@ def main():
             cost_d = int(cost_d)
             cost_e = int(cost_e)
             cost = np.array([cost_a,cost_b,cost_c,cost_d,cost_e])
-            samples.append([sample_id,carried_by,rank,expertise_gain,health,cost])
+            needed1 = np.maximum(cost - robots[0][3] - robots[0][4],0)
+            needed2 = np.maximum(cost - robots[1][3] - robots[1][4],0)
+            samples.append([sample_id,carried_by,rank,expertise_gain,health,cost,needed1,needed2])
 
         eprint("TURN",turn)
         [eprint(r) for r in robots]
@@ -80,7 +82,83 @@ def main():
         order = naivegreedystrategy(robots,samples)
         print(order)
         continue
+    
+#stockupstrategy:
+#Turn in anything
+#Stock up on samples
+#Assemble samples and block enemy
+#Discard worst samples
+#Get new samples
 
+#Does not account for multiple turn ins
+#Does not account for expertise
+#Does not account for science projects 
+def stockupstrategy(robots,samples):
+    ownedsamples = [s for s in samples if s[1]==0]
+    ownedsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
+    
+    ownedunknownsamples = [s for s in ownedsamples if s[4]==-1]
+    
+    cloudsamples = [s for s in samples if s[1]==-1]
+    cloudsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
+    
+    enemysamples = [s for s in samples if s[1]==1]
+    enemysamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
+    
+    turnin = possible_turnin(robots,samples,ownedsamples)
+    
+    #If we can turn anything in, turn in the first possible one
+    if(turnin):
+        eprint(turnin)
+        order = getorder_turnin(robots,turnin[0])
+        return(order)
+    if(robots[0][0] == 'DIAGNOSIS' and len(ownedunknownsamples)>0):
+        #eprint("unknown:",ownedunknownsamples)
+        order = getorder_diagnoseall(robots,samples)
+        return(order)
+    if(robots[0][0] == "SAMPLES"):
+        if(len(ownedsamples)==3 and len(ownedunknownsamples)>0):
+            order = getorder_diagnoseall(robots,samples)
+            return(order)
+        if(len(ownedsamples)<3):
+            order = getorder_newsamples(robots,samples)
+            return(order)
+    #If we can assemble a sample we own, do it
+    neededmatrix, possible_assemble_owned = immediately_collectable(robots,samples,ownedsamples)
+    if(any(possible_assemble_owned)):
+        to_assemble = ownedsamples[possible_assemble_owned.index(True)]
+        order = getorder_assemble(robots,samples,to_assemble)
+        return(order)
+        
+    
+    #if we have undiagnosed samples, diagnose them
+    #getorder_diagnosenew(robots,samples)
+    
+    #If neither of these work, discard diagnose new samples
+    #order = getorder_diagnosenew(robots,samples)
+    if(robots[0][0] == "DIAGNOSIS"):
+        if(len(ownedsamples)>0):
+            order = "CONNECT " + str(ownedsamples[-1][0]) #dump worst sample
+            return(order)
+        else:
+            order = "GOTO SAMPLES"
+            return(order)
+    if(len(ownedsamples)<3):
+        order = getorder_newsamples(robots,samples)
+        return(order)
+
+#naivegreedystrategy:
+#Turn in anything
+#Stock up on samples
+#Assemble samples if the molecules are available right now
+#Get samples from cloud we can assemble right now
+#Discard worst samples
+#Get new samples
+
+#Does not block enemy
+#Does not account for multiple turn ins
+#Does not account for expertise
+#Does not account for science projects
 def naivegreedystrategy(robots,samples):
     ownedsamples = [s for s in samples if s[1]==0]
     ownedsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
@@ -143,7 +221,32 @@ def naivegreedystrategy(robots,samples):
     if(len(ownedsamples)<3):
         order = getorder_newsamples(robots,samples)
         return(order)
-    
+        
+
+#input: robots and samples. to_assemble: The sample to assemble
+#Returns the molecule to get, which has the most molecules in common with the other molecules
+def getorder_assembleown_mostoverlap(robots,samples,to_assemble):
+    ownedsamples = [s for s in samples if s[1] == 0]
+    ownedsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
+    othersamples = ownedsamples.copy()
+    othersamples.remove(to_assemble)
+    eprint("ownedsamples",ownedsamples)
+    eprint("othersamples",othersamples)
+    '''
+    needed = np.maximum(to_assemble[5] - robots[0][3] - robots[0][4],0)
+
+    #If any of these are possible, do them:
+    #Do the first one which is possible
+    requestmol = None
+    for i,n in enumerate(needed):
+         #fill out the molecules we need in order from A to E. Could be improved by grabbing the most critical first probably, or the ones with most overlap
+         if(n>0):
+             requestmol = itm[i]
+             break
+    order = "CONNECT " + str(requestmol)
+    '''
+    eprint("")
+    return 
             
 #input: robots and samples. candidate_samples are the samples we wish to check for
 #Returns the list of possible sampleids we can turn in
@@ -155,11 +258,10 @@ def possible_turnin(robots,samples,candidate_samples):
     diagnosed = [s for s in candidate_samples if s[4]!=-1]
 
     turnin = []   
-
-    for s in diagnosed:    
-        needed = np.maximum(s[5] - robots[0][3] - robots[0][4],0)
-        if(all(n==0 for n in needed)):
+    for s in diagnosed:
+        if(all(n==0 for n in s[6])):
             turnin.append(s)
+    
     return turnin
 
 #needs: robots, samples, a list of samples to search in
@@ -176,8 +278,7 @@ def immediately_collectable(robots,samples,candidate_samples):
     #Molecules needed for each sample
     neededmatrix = []
     for o in diagnosed:
-        needed = np.maximum(o[5] - robots[0][3] - robots[0][4],0)
-        neededmatrix.append(needed)
+        neededmatrix.append(o[6])
     #neededmatrix: a row for each sample, describing what is needed
     #[eprint(n) for n in neededmatrix]
     stock = - robots[0][3] - robots[1][3] + 5 #Molecules left in stock(if there is a duplicate molecule, total will be 7, for -1 stock. special case handled)
@@ -206,12 +307,11 @@ def getorder_assemble(robots,samples,to_assemble):
     
     else:
         eprint("we can assemble", to_assemble)
-        needed = np.maximum(to_assemble[5] - robots[0][3] - robots[0][4],0)
 
         #If any of these are possible, do them:
         #Do the first one which is possible
         requestmol = None
-        for i,n in enumerate(needed):
+        for i,n in enumerate(to_assemble[6]):
              #fill out the molecules we need in order from A to E. Could be improved by grabbing the most critical first probably, or the ones with most overlap
              if(n>0):
                  requestmol = itm[i]
@@ -364,6 +464,7 @@ def availablemoves(robots,samples):
             if(all(v == 0 for v in finalcost)):
                 moves.append("CONNECT " + str(s[0]))
         return moves
+
     
 def eprint(*args,**kwargs):
     print(*args,file=sys.stderr,**kwargs)
