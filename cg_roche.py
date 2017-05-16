@@ -101,9 +101,13 @@ def naivegreedystrategy(robots,samples):
         #eprint("unknown:",ownedunknownsamples)
         order = getorder_diagnoseall(robots,samples)
         return(order)
-    if(robots[0][0] == "SAMPLES" and len(ownedsamples)==3 and len(ownedunknownsamples)>0):
-        order = getorder_diagnoseall(robots,samples)
-        return(order)
+    if(robots[0][0] == "SAMPLES"):
+        if(len(ownedsamples)==3 and len(ownedunknownsamples)>0):
+            order = getorder_diagnoseall(robots,samples)
+            return(order)
+        if(len(ownedsamples)<3):
+            order = getorder_newsamples(robots,samples)
+            return(order)
     #If we can assemble a sample we own, do it
     neededmatrix, possible_assemble_owned = immediately_collectable(robots,samples,ownedsamples)
     if(any(possible_assemble_owned)):
@@ -129,16 +133,17 @@ def naivegreedystrategy(robots,samples):
     
     #If neither of these work, discard diagnose new samples
     #order = getorder_diagnosenew(robots,samples)
+    if(robots[0][0] == "DIAGNOSIS"):
+        if(len(ownedsamples)>0):
+            order = "CONNECT " + str(ownedsamples[-1][0]) #dump worst sample
+            return(order)
+        else:
+            order = "GOTO SAMPLES"
+            return(order)
     if(len(ownedsamples)<3):
         order = getorder_newsamples(robots,samples)
         return(order)
-    if(len(ownedsamples)<=3):
-        if(robots[0][0] != "DIAGNOSIS"):
-            order = "GOTO DIAGNOSIS"
-            return(order)
-        else:
-            order = "CONNECT " + str(ownedsamples[-1][0]) #dump worst sample
-            return(order)
+    
             
 #input: robots and samples. candidate_samples are the samples we wish to check for
 #Returns the list of possible sampleids we can turn in
@@ -359,7 +364,6 @@ def availablemoves(robots,samples):
             if(all(v == 0 for v in finalcost)):
                 moves.append("CONNECT " + str(s[0]))
         return moves
-        
     
 def eprint(*args,**kwargs):
     print(*args,file=sys.stderr,**kwargs)
