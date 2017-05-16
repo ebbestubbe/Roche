@@ -205,12 +205,13 @@ def naivegreedystrategy(robots,samples):
             to_pickup = cloudsamples[possible_assemble_cloud.index(True)]
             order = "CONNECT " + str(to_pickup[0])
             return(order)
-    
+    eprint("nothing worth assembling")
     #if we have undiagnosed samples, diagnose them
     #getorder_diagnosenew(robots,samples)
     
     #If neither of these work, discard diagnose new samples
     #order = getorder_diagnosenew(robots,samples)
+    
     if(robots[0][0] == "DIAGNOSIS"):
         if(len(ownedsamples)>0):
             order = "CONNECT " + str(ownedsamples[-1][0]) #dump worst sample
@@ -281,7 +282,7 @@ def immediately_collectable(robots,samples,candidate_samples):
         neededmatrix.append(o[6])
     #neededmatrix: a row for each sample, describing what is needed
     #[eprint(n) for n in neededmatrix]
-    stock = - robots[0][3] - robots[1][3] + 5 #Molecules left in stock(if there is a duplicate molecule, total will be 7, for -1 stock. special case handled)
+    stock = np.maximum(- robots[0][3] - robots[1][3] + 5,0) #Molecules left in stock(if there is a duplicate molecule, total will be 6, for -1 stock. special case handled by np.maximum
     #eprint("stock:",stock)
     
     #Figure out which are possible to do atm:
@@ -353,6 +354,7 @@ def getorder_diagnosenew(robots,samples):
             order = "GOTO DIAGNOSIS"
           
     return order
+
 def getorder_diagnoseall(robots,samples):
     ownedunknownsamples = [s for s in samples if s[4] == -1 and s[1] == 0]
     if(robots[0][0] != "DIAGNOSIS"):
