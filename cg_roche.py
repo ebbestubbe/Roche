@@ -8,7 +8,7 @@ from collections import Counter
 # Bring data on patient samples from the diagnosis machine to the laboratory with enough molecules to produce medicine!
 mti = {"A":0,"B":1,"C":2,"D":3,"E":4}
 itm = {v:k for k,v in mti.items()}
-dist = np.array([[2,2,2,2],[0,3,3,3],[3,0,3,4],[3,3,0,3],[3,4,3,0]])
+dist_mat = np.array([[2,2,2,2],[0,3,3,3],[3,0,3,4],[3,3,0,3],[3,4,3,0]])
 pos_dict = {"START_POS": 0,"SAMPLES":1,"DIAGNOSIS":2,"MOLECULES":3,"LABORATORY":4}
 
 def main():
@@ -55,7 +55,7 @@ def main():
         
         available_a, available_b, available_c, available_d, available_e = [int(i) for i in input().split()]
         sample_count = int(input())
-        samples = [] #[0:id, 1:carriedby, 2:rank, 3:exp gain, 4:health,5:cost,6:needed for robot1,7:needed for robot2]
+        samples = [] #[0:id, 1:carriedby, 2:rank, 3:exp gain, 4:health,5:cost,6:needed for robot1,7:needed for robot2,8:timetofinish1, 9:timetofinish2]
         for i in range(sample_count):
             sample_id, carried_by, rank, expertise_gain, health, cost_a, cost_b, cost_c, cost_d, cost_e = input().split()
             sample_id = int(sample_id)
@@ -70,7 +70,9 @@ def main():
             cost = np.array([cost_a,cost_b,cost_c,cost_d,cost_e])
             needed1 = np.maximum(cost - robots[0][3] - robots[0][4],0)
             needed2 = np.maximum(cost - robots[1][3] - robots[1][4],0)
-            samples.append([sample_id,carried_by,rank,expertise_gain,health,cost,needed1,needed2])
+            timetofinish1 = np.sum(needed1) + getdist(robots[0][0],'MOLECULES') + robots[0][1]
+            timetofinish2 = np.sum(needed2) + getdist(robots[1][0],'MOLECULES') + robots[1][1]
+            samples.append([sample_id,carried_by,rank,expertise_gain,health,cost,needed1,needed2,timetofinish1,timetofinish2])
 
         eprint("TURN",turn)
         [eprint(r) for r in robots]
@@ -107,6 +109,8 @@ def stockupstrategy(robots,samples):
     
     turnin = possible_turnin(robots,samples,ownedsamples)
     
+    blockmatrix,possible_block = blockable(robots,samples,enemysamples)
+    eprint
     #If we can turn anything in, turn in the first possible one
     if(turnin):
         eprint(turnin)
@@ -124,17 +128,21 @@ def stockupstrategy(robots,samples):
             order = getorder_newsamples(robots,samples)
             return(order)
     #If we can assemble a sample we own, do it
-    neededmatrix, possible_assemble_owned = immediately_collectable(robots,samples,ownedsamples)
     
-    eprint("neededmatrix")
-    [eprint(n) for n in neededmatrix]
-    eprint("possible",possible_assemble_owned)
+    #blockmatrix,possible_block = blockable(robots,samples,enemysamples)
     
+    #if(any(possible_block)):
+    #    order = getorder_retrievemolecules(robots,samples,)
+    #neededmatrix, possible_assemble_owned = immediately_collectable(robots,samples,ownedsamples)
     
-    if(any(possible_assemble_owned)):
-        to_assemble = ownedsamples[possible_assemble_owned.index(True)]
-        order = getorder_assemble(robots,samples,to_assemble)
-        return(order)
+    #eprint("neededmatrix")
+    #[eprint(n) for n in neededmatrix]
+    #eprint("possible",possible_assemble_owned)
+    
+    #if(any(possible_assemble_owned)):
+    #    to_assemble = ownedsamples[possible_assemble_owned.index(True)]
+    #    order = getorder_assemble(robots,samples,to_assemble)
+    #    return(order)
         
     
     #if we have undiagnosed samples, diagnose them
@@ -229,7 +237,7 @@ def naivegreedystrategy(robots,samples):
         order = getorder_newsamples(robots,samples)
         return(order)
         
-
+'''
 #input: robots and samples. to_assemble: The sample to assemble
 #Returns the molecule to get, which has the most molecules in common with the other molecules
 def getorder_assembleown_mostoverlap(robots,samples,to_assemble):
@@ -254,7 +262,7 @@ def getorder_assembleown_mostoverlap(robots,samples,to_assemble):
     '''
     eprint("")
     return 
-            
+'''        
 #input: robots and samples. candidate_samples are the samples we wish to check for
 #Returns the list of possible sampleids we can turn in
 #Accounts for discounts
@@ -288,7 +296,8 @@ def immediately_collectable(robots,samples,candidate_samples):
         neededmatrix.append(o[6])
     #neededmatrix: a row for each sample, describing what is needed
     #[eprint(n) for n in neededmatrix]
-    stock = np.maximum(- robots[0][3] - robots[1][3] + 5,0) #Molecules left in stock(if there is a duplicate molecule, total will be 6, for -1 stock. special case handled by np.maximum
+    stock = getstock(robots)
+    
     #eprint("stock:",stock)
     
     #Figure out which are possible to do atm:
@@ -300,7 +309,33 @@ def immediately_collectable(robots,samples,candidate_samples):
             
     return neededmatrix, possible
 
+#For a list of blocksamples, figure out which of these we can block.
+#If the enemy wants to pick up molecules for the sample, the category which there are fewest if after potential pickup, are the ones we can block.
+#returns: 
+    #priority: list for each sample, the ordered priority of what molecules to block.
+    #remainder: list for each sample, the needed amount of molecules to block
+    #possible_block: bool for each sample, if it is possible to block it in time, assuming enemy goes straight for it.
     
+def blockable(robots,samples,enemysamples):
+    stock = getstock(robots)
+    eprint("stock:",stock)
+    priorities = []
+    remainders = []
+    possible_blocks = []
+    for i in range(len(enemysamples)):
+        remainder = stock-enemysamples[i][7]
+        eprint("sample",enemysamples[i])
+        eprint("remainder before nan",remainder)
+        for j in range(len(remainder)):
+            if(enemysamples[i][7][j] == 0):
+                remainder[j] = np.nan
+        eprint("remainder after nan",remainder)
+        priority = np.argsort(remainder)
+        eprint("priority",priority)
+        turns_to_block = remainder[priority[0]] + dist(robots[1][0],"MOLECULES") + robots[1][1] #After this many turns, the last molecule has been picked up.
+        priorities.append(priority)
+        remainders.append(possible_blocks)
+        
 #returns the order needed to turn in a sample
 def getorder_turnin(robots,sample):
     if(robots[0][0] != "LABORATORY"):
@@ -475,7 +510,16 @@ def availablemoves(robots,samples):
                 moves.append("CONNECT " + str(s[0]))
         return moves
 
-    
+def getdist(pos1,pos2):
+    pos1 = pos_dict[pos1]
+    pos2 = pos_dict[pos2]
+    dist = dist_mat[pos1,pos2]
+    return dist
+
+def getstock(robots):
+    stock = np.maximum(- robots[0][3] - robots[1][3] + 5,0) #Molecules left in stock(if there is a duplicate molecule, total will be 6, for -1 stock. special case handled by np.maximum
+    return stock
+                       
 def eprint(*args,**kwargs):
     print(*args,file=sys.stderr,**kwargs)
 if(__name__) == "__main__":
