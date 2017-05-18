@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 from collections import Counter
-
+import itertools
 #Notes:
     #If the enemy moves to laboratory, he has enough to turn in his samples
 
@@ -12,12 +12,7 @@ dist_mat = np.array([[2,2,2,2],[0,3,3,3],[3,0,3,4],[3,3,0,3],[3,4,3,0]])
 pos_dict = {"START_POS": 0,"SAMPLES":1,"DIAGNOSIS":2,"MOLECULES":3,"LABORATORY":4}
 
 def main():
-    '''
-    a = np.array([0,2,9,-1])
-    b = a.argsort()[::-1]
-    print(b)
-    return
-    '''
+    
     projects = []
     project_count = int(input())
     for i in range(project_count):
@@ -69,6 +64,7 @@ def main():
             needed2 = np.maximum(cost - robots[1][3] - robots[1][4],0)
             timetofinish1 = np.sum(needed1) + getdist(robots[0][0],'MOLECULES') + robots[0][1]
             timetofinish2 = np.sum(needed2) + getdist(robots[1][0],'MOLECULES') + robots[1][1]
+            #eprint(expertise_gain)
             samples.append([sample_id,carried_by,rank,expertise_gain,health,cost,needed1,needed2,timetofinish1,timetofinish2])
 
         eprint("TURN",turn)
@@ -114,6 +110,12 @@ def stockupstrategy(robots,samples):
     #    eprint(turnin)
     #    order = getorder_turnin(robots,turnin[0])
     #    return(order)
+    #needed_for_turnin = needed_for_turnin_exp(robots,samples,ownedsamples)
+    ownedknownsamples = [s for s in ownedsamples if s[4]!=-1]
+    needed_sequence = needed_for_sequence(robots,ownedknownsamples)
+    eprint(needed_sequence)
+    try_all_sequences(robots,samples,ownedknownsamples)
+    
     if(robots[0][0] == 'LABORATORY' and turnin):
         eprint(turnin)
         order = getorder_turnin(robots,turnin[0])
@@ -410,10 +412,10 @@ def getorder_stockup(robots,samples):
     
     
     ownedsamples = [s for s in samples if s[1] == 0]
-    eprint("ownedsamples:")
+    #eprint("ownedsamples:")
     [eprint(s) for s in ownedsamples]
     can_turnin = [False]*len(ownedsamples)
-    eprint("TURN IN")
+    #eprint("TURN IN")
     for i,s in enumerate(ownedsamples):
         needed = np.maximum(s[5]-robots[0][4],0)
         eprint("sample",s)
@@ -426,15 +428,15 @@ def getorder_stockup(robots,samples):
             can_turnin[i] = True
         #else: break
 
-    eprint("can turn in",can_turnin)
-    eprint("storage",robots[0][3])
+    #eprint("can turn in",can_turnin)
+    #eprint("storage",robots[0][3])
     freespace = 10 - np.sum(robots[0][3])  
-    eprint("freespace",freespace)
+    #eprint("freespace",freespace)
     can_assemble = [False]*len(ownedsamples)
     tentative_stock = getstock(robots)
     
-    eprint("tentativestock",tentative_stock)
-    eprint("POSSIBLE ASSEMBLY")
+    #eprint("tentativestock",tentative_stock)
+    #eprint("POSSIBLE ASSEMBLY")
     neededmatrix = []
     for i,s in enumerate(ownedsamples):
         if(can_turnin[i]):
@@ -443,33 +445,33 @@ def getorder_stockup(robots,samples):
         discountcost = np.maximum(s[5]-robots[0][4],0)
         needed = np.maximum(discountcost-unused_mol,0)
         neededmatrix.append(needed)
-        eprint("sample",s)
-        eprint("needed",needed)
-        eprint("tentstock",tentative_stock)
-        eprint("tentstorage",unused_mol)
-        eprint("freespace",freespace)
+        #eprint("sample",s)
+        #eprint("needed",needed)
+        #eprint("tentstock",tentative_stock)
+        #eprint("tentstorage",unused_mol)
+        #eprint("freespace",freespace)
         room = freespace-np.sum(needed)>=0
-        eprint("do we have room",room)
+        #eprint("do we have room",room)
         available = all(tentative_stock>=needed)
-        eprint("are the molecules available",available)
+        #eprint("are the molecules available",available)
         diagnosed = (s[4] != -1)
-        eprint("diagnosed",diagnosed)
+        #eprint("diagnosed",diagnosed)
         if(room and diagnosed and available):
             freespace-=np.sum(needed)
             tentative_stock-=needed
             can_assemble[i] = True
-    eprint("can assemble",can_assemble)
-    eprint(neededmatrix)
+    #eprint("can assemble",can_assemble)
+    #eprint(neededmatrix)
     if(any(can_assemble)):
             
         to_assemble = can_assemble.index(True)
-        eprint("we can assemble",ownedsamples[to_assemble])
+        #eprint("we can assemble",ownedsamples[to_assemble])
         priority = neededmatrix[to_assemble].argsort()[::-1]
         order = getorder_getmolecule_bypriority(robots,samples,priority)        
         #order = getorder_assemble(robots,samples,ownedsamples[to_assemble])
         return order
     else:
-        eprint("we cant assemble")
+        #eprint("we cant assemble")
         priority = np.array([1,2,0,3,4])
         order = getorder_getmolecule_bypriority(robots,samples,priority)
         return order
@@ -477,12 +479,61 @@ def getorder_stockup(robots,samples):
 def getorder_getmolecule_bypriority(robots,samples,priority):
     stock = getstock(robots)
     for i,p in enumerate(priority):
-        eprint("checking molecule",p)
+        #eprint("checking molecule",p)
         if(stock[p]>0):
-            eprint("we can get molecule",p)
+            #eprint("we can get molecule",p)
             order = "CONNECT " + str(itm[p])
             return order
+'''
+def getbest_turnin(robots,samples,candidate_samples):
+    eprint("CALCULATING TURN IN")
+    #Go through the storage(unused molecules) and samples, to determine which are already able to be assembled
+    
+    tentative_exp = np.copy(robots[0][4])
+    #ownedsamples = [s for s in samples if s[1] == 0]
+    eprint("candidates")
+    [eprint(s) for s in candidate_samples]
+    total_needed = np.array([0,0,0,0,0])
+    eprint("calc needed")
+    for i,s in enumerate(ownedsamples):
+        expgain = itm[s[3]]
+        needed = np.maximum(s[5]-tentative_exp,0)
+        eprint("sample",s)
+        eprint("needed",needed)
+        if(s[4] == -1):
+            continue
+        if(all(needed<=unused_mol)):
+            #we can assemble 's'
+            unused_mol -= needed
+            can_turnin[i] = True
+        #else: break
+    return needed,score,exp
+'''
 
+
+    
+#assumes the samples are diagnosed
+def needed_for_sequence(robots,samplesequence):
+    tentative_exp = np.copy(robots[0][4])
+    needed = np.array([0,0,0,0,0])
+    eprint("sequnece")
+    [eprint(s) for s in samplesequence]
+    for i,s in enumerate(samplesequence):
+        needed += np.maximum(s[5]-tentative_exp,0)
+        expgained = mti[s[3]] #molecule to int
+        tentative_exp[expgained]+=1
+    eprint("tentexp",tentative_exp)    
+    eprint("needed",needed)
+    return needed
+
+#assumes the samples are diagnosed
+def try_all_sequences(robots,samples,candidate_samples):
+    
+    all_sequences = list(itertools.permutations(candidate_samples))
+    for i,seq in enumerate(all_sequences):    
+        needed_for_sequence(robots,seq)
+    return
+            
 def getorder_diagnosenew(robots,samples):
     ownedsamples = [s for s in samples if s[1] == 0]
     #ownedsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
@@ -532,7 +583,6 @@ def getorder_newsamples(robots,samples):
         if(len([s for s in samples if s[1] == 0]) < 3):
             #desired: the desired ranks 
             currentranks = Counter([s[2] for s in samples if s[1] == 0])
-            eprint("currentranks",currentranks)
             if(np.sum(robots[0][4])<2):
                 desired = [1,1,1]
             elif(np.sum(robots[0][4])<4 and np.sum(robots[0][4])>=2):
@@ -546,10 +596,8 @@ def getorder_newsamples(robots,samples):
             else:#(np.sum(robots[0][4])>=8):
                 desired = [3,3,3]
             desired = Counter(desired)
-            eprint("desired",desired)
             to_order = list((desired-currentranks).elements())
             
-            eprint("to_order",to_order)
             order = "CONNECT " + str(to_order[-1])
     return order
 
