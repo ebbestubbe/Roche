@@ -12,13 +12,10 @@ dist_mat = np.array([[2,2,2,2],[0,3,3,3],[3,0,3,4],[3,3,0,3],[3,4,3,0]])
 pos_dict = {"START_POS": 0,"SAMPLES":1,"DIAGNOSIS":2,"MOLECULES":3,"LABORATORY":4}
 
 def main():
-
-    '''    
-    a = [0,1,2,3,4,5]
-    b = [False,True,True]
-    c = b.index(True)
+    '''
+    a = np.array([0,2,9,-1])
+    b = a.argsort()[::-1]
     print(b)
-    print(a[c])
     return
     '''
     projects = []
@@ -81,6 +78,7 @@ def main():
         #moves = availablemoves(robots,samples)
         #eprint("available moves:")
         #[eprint(m) for m in moves]
+        #order = naivegreedystrategy(robots,samples)
         order = stockupstrategy(robots,samples)
         print(order)
         continue
@@ -109,10 +107,14 @@ def stockupstrategy(robots,samples):
     
     turnin = possible_turnin(robots,samples,ownedsamples)
     
-    blockmatrix,possible_block = blockable(robots,samples,enemysamples)
-    eprint
+    #blockmatrix,possible_block = blockable(robots,samples,enemysamples)
+    #eprint
     #If we can turn anything in, turn in the first possible one
-    if(turnin):
+    #if(turnin):
+    #    eprint(turnin)
+    #    order = getorder_turnin(robots,turnin[0])
+    #    return(order)
+    if(robots[0][0] == 'LABORATORY' and turnin):
         eprint(turnin)
         order = getorder_turnin(robots,turnin[0])
         return(order)
@@ -127,6 +129,19 @@ def stockupstrategy(robots,samples):
         if(len(ownedsamples)<3):
             order = getorder_newsamples(robots,samples)
             return(order)
+    neededmatrix, possible_assemble_owned = immediately_collectable(robots,samples,ownedsamples)
+    if(any(possible_assemble_owned) and robots[0][0] != "MOLECULES" and np.sum(robots[0][3])<10):
+        eprint("We are going to molecules")
+        order = "GOTO MOLECULES"
+        return(order)
+    if(robots[0][0] == "MOLECULES" and np.sum(robots[0][3])<10):
+        order = getorder_stockup(robots,samples)
+        return order
+    if(turnin):
+        eprint(turnin)
+        order = getorder_turnin(robots,turnin[0])
+        return(order)
+        
     #If we can assemble a sample we own, do it
     
     #blockmatrix,possible_block = blockable(robots,samples,enemysamples)
@@ -143,13 +158,27 @@ def stockupstrategy(robots,samples):
     #    to_assemble = ownedsamples[possible_assemble_owned.index(True)]
     #    order = getorder_assemble(robots,samples,to_assemble)
     #    return(order)
-        
+    
+    neededmatrix,possible_assemble_cloud = immediately_collectable(robots,samples,cloudsamples)
+    if(any(possible_assemble_cloud)):
+        if(robots[0][0] != "DIAGNOSIS"):
+            order = "GOTO DIAGNOSIS"
+            return(order)
+        #first discard
+        if(len(ownedsamples)==3):
+            order = "CONNECT " + str(ownedsamples[-1][0])
+            return(order)
+        else:
+            to_pickup = cloudsamples[possible_assemble_cloud.index(True)]
+            order = "CONNECT " + str(to_pickup[0])
+            return(order)
     
     #if we have undiagnosed samples, diagnose them
     #getorder_diagnosenew(robots,samples)
     
     #If neither of these work, discard diagnose new samples
     #order = getorder_diagnosenew(robots,samples)
+    '''
     if(robots[0][0] == "DIAGNOSIS"):
         if(len(ownedsamples)>0):
             order = "CONNECT " + str(ownedsamples[-1][0]) #dump worst sample
@@ -157,7 +186,15 @@ def stockupstrategy(robots,samples):
         else:
             order = "GOTO SAMPLES"
             return(order)
-    if(len(ownedsamples)<3):
+    '''
+    if(len(ownedsamples)>0):
+        if(robots[0][0] == "DIAGNOSIS"):
+            order = "CONNECT " + str(ownedsamples[-1][0]) #dump worst sample
+            return(order)
+        else:
+            order = "GOTO DIAGNOSIS"
+            return(order)
+    if(len(ownedsamples)==0):
         order = getorder_newsamples(robots,samples)
         return(order)
 
@@ -233,6 +270,7 @@ def naivegreedystrategy(robots,samples):
         else:
             order = "GOTO SAMPLES"
             return(order)
+        
     if(len(ownedsamples)<3):
         order = getorder_newsamples(robots,samples)
         return(order)
@@ -247,7 +285,7 @@ def getorder_assembleown_mostoverlap(robots,samples,to_assemble):
     othersamples.remove(to_assemble)
     eprint("ownedsamples",ownedsamples)
     eprint("othersamples",othersamples)
-    '''
+    
     needed = np.maximum(to_assemble[5] - robots[0][3] - robots[0][4],0)
 
     #If any of these are possible, do them:
@@ -259,7 +297,7 @@ def getorder_assembleown_mostoverlap(robots,samples,to_assemble):
              requestmol = itm[i]
              break
     order = "CONNECT " + str(requestmol)
-    '''
+    
     eprint("")
     return 
 '''        
@@ -315,7 +353,7 @@ def immediately_collectable(robots,samples,candidate_samples):
     #priority: list for each sample, the ordered priority of what molecules to block.
     #remainder: list for each sample, the needed amount of molecules to block
     #possible_block: bool for each sample, if it is possible to block it in time, assuming enemy goes straight for it.
-    
+'''
 def blockable(robots,samples,enemysamples):
     stock = getstock(robots)
     eprint("stock:",stock)
@@ -333,9 +371,10 @@ def blockable(robots,samples,enemysamples):
         priority = np.argsort(remainder)
         eprint("priority",priority)
         turns_to_block = remainder[priority[0]] + dist(robots[1][0],"MOLECULES") + robots[1][1] #After this many turns, the last molecule has been picked up.
+        turns_available = 
         priorities.append(priority)
         remainders.append(possible_blocks)
-        
+'''     
 #returns the order needed to turn in a sample
 def getorder_turnin(robots,sample):
     if(robots[0][0] != "LABORATORY"):
@@ -350,7 +389,7 @@ def getorder_assemble(robots,samples,to_assemble):
         order = "GOTO MOLECULES"
     
     else:
-        eprint("we can assemble", to_assemble)
+        #eprint("we can assemble", to_assemble)
 
         #If any of these are possible, do them:
         #Do the first one which is possible
@@ -362,7 +401,87 @@ def getorder_assemble(robots,samples,to_assemble):
                  break
         order = "CONNECT " + str(requestmol)
     return order
-#def getorder_getfromcloud():
+
+#Assumes we are at molecules, gives order to stock up on the right molecules
+def getorder_stockup(robots,samples):
+    eprint("STOCKING UP")
+    #Go through the storage(unused molecules) and samples, to determine which are already able to be assembled
+    unused_mol = np.copy(robots[0][3])#The cargo we can use to solve samples
+    
+    
+    ownedsamples = [s for s in samples if s[1] == 0]
+    eprint("ownedsamples:")
+    [eprint(s) for s in ownedsamples]
+    can_turnin = [False]*len(ownedsamples)
+    eprint("TURN IN")
+    for i,s in enumerate(ownedsamples):
+        needed = np.maximum(s[5]-robots[0][4],0)
+        eprint("sample",s)
+        eprint("needed",needed)
+        if(s[4] == -1):
+            continue
+        if(all(needed<=unused_mol)):
+            #we can assemble 's'
+            unused_mol -= needed
+            can_turnin[i] = True
+        #else: break
+
+    eprint("can turn in",can_turnin)
+    eprint("storage",robots[0][3])
+    freespace = 10 - np.sum(robots[0][3])  
+    eprint("freespace",freespace)
+    can_assemble = [False]*len(ownedsamples)
+    tentative_stock = getstock(robots)
+    
+    eprint("tentativestock",tentative_stock)
+    eprint("POSSIBLE ASSEMBLY")
+    neededmatrix = []
+    for i,s in enumerate(ownedsamples):
+        if(can_turnin[i]):
+            neededmatrix.append(np.array([0,0,0,0,0]))
+            continue
+        discountcost = np.maximum(s[5]-robots[0][4],0)
+        needed = np.maximum(discountcost-unused_mol,0)
+        neededmatrix.append(needed)
+        eprint("sample",s)
+        eprint("needed",needed)
+        eprint("tentstock",tentative_stock)
+        eprint("tentstorage",unused_mol)
+        eprint("freespace",freespace)
+        room = freespace-np.sum(needed)>=0
+        eprint("do we have room",room)
+        available = all(tentative_stock>=needed)
+        eprint("are the molecules available",available)
+        diagnosed = (s[4] != -1)
+        eprint("diagnosed",diagnosed)
+        if(room and diagnosed and available):
+            freespace-=np.sum(needed)
+            tentative_stock-=needed
+            can_assemble[i] = True
+    eprint("can assemble",can_assemble)
+    eprint(neededmatrix)
+    if(any(can_assemble)):
+            
+        to_assemble = can_assemble.index(True)
+        eprint("we can assemble",ownedsamples[to_assemble])
+        priority = neededmatrix[to_assemble].argsort()[::-1]
+        order = getorder_getmolecule_bypriority(robots,samples,priority)        
+        #order = getorder_assemble(robots,samples,ownedsamples[to_assemble])
+        return order
+    else:
+        eprint("we cant assemble")
+        priority = np.array([1,2,0,3,4])
+        order = getorder_getmolecule_bypriority(robots,samples,priority)
+        return order
+    
+def getorder_getmolecule_bypriority(robots,samples,priority):
+    stock = getstock(robots)
+    for i,p in enumerate(priority):
+        eprint("checking molecule",p)
+        if(stock[p]>0):
+            eprint("we can get molecule",p)
+            order = "CONNECT " + str(itm[p])
+            return order
 
 def getorder_diagnosenew(robots,samples):
     ownedsamples = [s for s in samples if s[1] == 0]
@@ -415,12 +534,14 @@ def getorder_newsamples(robots,samples):
             currentranks = Counter([s[2] for s in samples if s[1] == 0])
             eprint("currentranks",currentranks)
             if(np.sum(robots[0][4])<2):
-                desired = [1,1,2]
+                desired = [1,1,1]
             elif(np.sum(robots[0][4])<4 and np.sum(robots[0][4])>=2):
-                desired = [1,2,2]
+                desired = [1,1,2]
             elif(np.sum(robots[0][4])<6 and np.sum(robots[0][4])>=4):
-                desired = [1,2,3]
+                desired = [1,2,2]
             elif(np.sum(robots[0][4])<8 and np.sum(robots[0][4])>=6):
+                desired = [2,2,2]
+            elif(np.sum(robots[0][4])<9 and np.sum(robots[0][4])>=8):
                 desired = [2,2,3]
             else:#(np.sum(robots[0][4])>=8):
                 desired = [3,3,3]
