@@ -62,10 +62,11 @@ def main():
             cost = np.array([cost_a,cost_b,cost_c,cost_d,cost_e])
             needed1 = np.maximum(cost - robots[0][3] - robots[0][4],0)
             needed2 = np.maximum(cost - robots[1][3] - robots[1][4],0)
-            timetofinish1 = np.sum(needed1) + getdist(robots[0][0],'MOLECULES') + robots[0][1]
-            timetofinish2 = np.sum(needed2) + getdist(robots[1][0],'MOLECULES') + robots[1][1]
+            #timetofinish1 = np.sum(needed1) + getdist(robots[0][0],'MOLECULES') + robots[0][1]
+            #timetofinish2 = np.sum(needed2) + getdist(robots[1][0],'MOLECULES') + robots[1][1]
             #eprint(expertise_gain)
-            samples.append([sample_id,carried_by,rank,expertise_gain,health,cost,needed1,needed2,timetofinish1,timetofinish2])
+            #samples.append([sample_id,carried_by,rank,expertise_gain,health,cost,needed1,needed2,timetofinish1,timetofinish2])
+            samples.append([sample_id,carried_by,rank,expertise_gain,health,cost,needed1,needed2])
 
         eprint("TURN",turn)
         [eprint(r) for r in robots]
@@ -102,8 +103,9 @@ def sequencestrategy(projects,robots,samples):
         if(turnin):
             seq_info = try_all_sequences(projects,robots,samples,ownedknownsamples)
             seq_info.sort(key= lambda x: (-x[3],sum(x[1])))
-            
+            seq_info = [s for s in seq_info if sum(s[2]) == 0]
             to_turnin_ind = [s[0] for s in seq_info].index(True)
+            
             order = "CONNECT " + str(seq_info[to_turnin_ind][6][0][0])
             return(order)
         elif(len(ownedsamples)<2):
@@ -123,19 +125,24 @@ def sequencestrategy(projects,robots,samples):
     #eprint("SEQ INFO LOGIC")
     if(len(ownedknownsamples)>0):
         seq_info = try_all_sequences(projects,robots,samples,ownedknownsamples)
+        seq_info.sort(key= lambda x: (-x[3],x[5]))
         #[eprint(seq) for seq in seq_info]
         #eprint("seq info:")
         #[eprint(s) for s in seq_info]
-        if(any([s[0] for s in seq_info])):
-            #eprint("SOME OF THEM ARE POSSIBLE")
+        
+        if(any([s[0] and sum(s[2])>0 for s in seq_info])):
+            eprint("SOME OF THEM ARE POSSIBLE")
             if(robots[0][0] != "MOLECULES"):
                 order = "GOTO MOLECULES"
                 return(order)
             if(robots[0][0] == "MOLECULES" and np.sum(robots[0][3])<10):
-                seq_info.sort(key= lambda x: (-x[3],x[5]))
+                
                 #eprint("sorted seq info:")
                 #[eprint(s) for s in seq_info]
-                to_assemble_ind = [s[0] for s in seq_info].index(True)
+                #for i,s in enumerate(seq_info):
+                #        if(s[0] == True):
+                            
+                to_assemble_ind = [s[0] and sum(s[2])>0 for s in seq_info].index(True)
                 
                 eprint("to_assemble",seq_info[to_assemble_ind])
                 #priority = seq_info[to_assemble_ind].argsort()[::-1]
@@ -145,9 +152,10 @@ def sequencestrategy(projects,robots,samples):
                 order = getorder_getmolecule_bypriority(robots,samples,priority)   
                 #eprint(order)
                 return(order)
+        '''
         else:
             if(robots[0][0] == "MOLECULES" and np.sum(robots[0][3])<10):
-                #eprint("none of them are possible")
+                eprint("none of them are possible")
                 seq_info.sort(key= lambda x: (-x[3],x[5]))
                 #eprint("sorted seq info:")
                 #[eprint(s) for s in seq_info]
@@ -159,6 +167,7 @@ def sequencestrategy(projects,robots,samples):
                 order = getorder_getmolecule_bypriority(robots,samples,priority)   
                 #eprint(order)
                 return(order)
+        '''
     #eprint("AFTER SEQ LOGIC")   
 
     if(turnin):
@@ -720,14 +729,14 @@ def getorder_newsamples_conservative(robots,samples):
             if(np.sum(robots[0][4])<3):
                 desired = [1,1,1]
             elif(np.sum(robots[0][4])<4 and np.sum(robots[0][4])>=3):
-                desired = [1,1,2]
+                desired = [1,1,1]
             elif(np.sum(robots[0][4])<6 and np.sum(robots[0][4])>=4):
                 desired = [1,1,2]
-            elif(np.sum(robots[0][4])<8 and np.sum(robots[0][4])>=6):
+            elif(np.sum(robots[0][4])<9 and np.sum(robots[0][4])>=6):
                 desired = [1,2,2]
-            elif(np.sum(robots[0][4])<9 and np.sum(robots[0][4])>=8):
-                desired = [2,2,2]
             elif(np.sum(robots[0][4])<11 and np.sum(robots[0][4])>=9):
+                desired = [2,2,2]
+            elif(np.sum(robots[0][4])<14 and np.sum(robots[0][4])>=11):
                 desired = [2,2,3]
             else:#(np.sum(robots[0][4])>=8):
                 
