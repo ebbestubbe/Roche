@@ -8,7 +8,7 @@ import itertools
 # Bring data on patient samples from the diagnosis machine to the laboratory with enough molecules to produce medicine!
 mti = {"A":0,"B":1,"C":2,"D":3,"E":4}
 itm = {v:k for k,v in mti.items()}
-dist_mat = np.array([[2,2,2,2],[0,3,3,3],[3,0,3,4],[3,3,0,3],[3,4,3,0]])
+dist_mat = np.array([[1000,2,2,2,2],[1000,0,3,3,3],[1000,3,0,3,4],[1000,3,3,0,3],[1000,3,4,3,0]])
 pos_dict = {"START_POS": 0,"SAMPLES":1,"DIAGNOSIS":2,"MOLECULES":3,"LABORATORY":4}
 
 def main():
@@ -75,10 +75,127 @@ def main():
         #eprint("available moves:")
         #[eprint(m) for m in moves]
         #order = naivegreedystrategy(robots,samples)
-        order = stockupstrategy(robots,samples)
+        order = sequencestrategy(projects,robots,samples)
         print(order)
         continue
+
+def sequencestrategy(projects,robots,samples):
+    ownedsamples = [s for s in samples if s[1]==0]
+    ownedsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
     
+    ownedunknownsamples = [s for s in ownedsamples if s[4]==-1]
+    
+    cloudsamples = [s for s in samples if s[1]==-1]
+    cloudsamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
+    
+    enemysamples = [s for s in samples if s[1]==1]
+    enemysamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
+    
+    turnin = possible_turnin(robots,samples,ownedsamples)
+    ownedknownsamples = [s for s in ownedsamples if s[4]!=-1]
+
+    #eprint("STARTING LOGIC")
+    #if(len(ownedknownsamples)>0):
+    #    seq_info = try_all_sequences(projects,robots,samples,ownedknownsamples)
+    #    [eprint(seq) for seq in seq_info]
+    if(robots[0][0] == 'LABORATORY'):
+        if(turnin):
+            seq_info = try_all_sequences(projects,robots,samples,ownedknownsamples)
+            seq_info.sort(key= lambda x: (-x[3],sum(x[1])))
+            
+            to_turnin_ind = [s[0] for s in seq_info].index(True)
+            order = "CONNECT " + str(seq_info[to_turnin_ind][6][0][0])
+            return(order)
+        elif(len(ownedsamples)<2):
+            order = "GOTO SAMPLES"
+            return(order)
+    if(robots[0][0] == 'DIAGNOSIS' and len(ownedunknownsamples)>0):
+        #eprint("unknown:",ownedunknownsamples)
+        order = getorder_diagnoseall(robots,samples)
+        return(order)
+    if(robots[0][0] == "SAMPLES"):
+        if(len(ownedsamples)==3 and len(ownedunknownsamples)>0):
+            order = getorder_diagnoseall(robots,samples)
+            return(order)
+        if(len(ownedsamples)<3):
+            order = getorder_newsamples_conservative(robots,samples)
+            return(order)
+    #eprint("SEQ INFO LOGIC")
+    if(len(ownedknownsamples)>0):
+        seq_info = try_all_sequences(projects,robots,samples,ownedknownsamples)
+        #[eprint(seq) for seq in seq_info]
+        #eprint("seq info:")
+        #[eprint(s) for s in seq_info]
+        if(any([s[0] for s in seq_info])):
+            #eprint("SOME OF THEM ARE POSSIBLE")
+            if(robots[0][0] != "MOLECULES"):
+                order = "GOTO MOLECULES"
+                return(order)
+            if(robots[0][0] == "MOLECULES" and np.sum(robots[0][3])<10):
+                seq_info.sort(key= lambda x: (-x[3],x[5]))
+                #eprint("sorted seq info:")
+                #[eprint(s) for s in seq_info]
+                to_assemble_ind = [s[0] for s in seq_info].index(True)
+                
+                eprint("to_assemble",seq_info[to_assemble_ind])
+                #priority = seq_info[to_assemble_ind].argsort()[::-1]
+                priority = seq_info[to_assemble_ind][2].argsort()[::-1]
+
+                #eprint("priority",priority)
+                order = getorder_getmolecule_bypriority(robots,samples,priority)   
+                #eprint(order)
+                return(order)
+        else:
+            if(robots[0][0] == "MOLECULES" and np.sum(robots[0][3])<10):
+                #eprint("none of them are possible")
+                seq_info.sort(key= lambda x: (-x[3],x[5]))
+                #eprint("sorted seq info:")
+                #[eprint(s) for s in seq_info]
+
+                #priority = seq_info[to_assemble_ind].argsort()[::-1]
+                priority = seq_info[0][2].argsort()[::-1]
+
+                #eprint("priority",priority)
+                order = getorder_getmolecule_bypriority(robots,samples,priority)   
+                #eprint(order)
+                return(order)
+    #eprint("AFTER SEQ LOGIC")   
+
+    if(turnin):
+        eprint(turnin)
+        order = getorder_turnin(robots,turnin[0])
+        return(order)
+
+    '''
+    neededmatrix,possible_assemble_cloud = immediately_collectable(robots,samples,cloudsamples)
+    if(any(possible_assemble_cloud)):
+        if(robots[0][0] != "DIAGNOSIS"):
+            order = "GOTO DIAGNOSIS"
+            return(order)
+        #first discard
+        if(len(ownedsamples)==3):
+            order = "CONNECT " + str(ownedsamples[-1][0])
+            return(order)
+        else:
+            to_pickup = cloudsamples[possible_assemble_cloud.index(True)]
+            order = "CONNECT " + str(to_pickup[0])
+            return(order)
+    '''
+    if(robots[0][0] == "DIAGNOSIS"):
+        if(len(ownedsamples)>0):
+            order = "CONNECT " + str(ownedsamples[-1][0]) #dump worst sample
+            return(order)
+        else:
+            order = "GOTO SAMPLES"
+            return(order)
+
+    if(len(ownedsamples)<3):
+        order = getorder_newsamples_conservative(robots,samples)
+        return(order)
+    else:
+        order = "GOTO DIAGNOSIS"
+        return(order)
+
 #stockupstrategy:
 #Turn in anything
 #Stock up on samples
@@ -102,19 +219,9 @@ def stockupstrategy(robots,samples):
     enemysamples.sort(key = lambda x: x[4]/sum(x[5]),reverse=True)
     
     turnin = possible_turnin(robots,samples,ownedsamples)
-    
-    #blockmatrix,possible_block = blockable(robots,samples,enemysamples)
-    #eprint
-    #If we can turn anything in, turn in the first possible one
-    #if(turnin):
-    #    eprint(turnin)
-    #    order = getorder_turnin(robots,turnin[0])
-    #    return(order)
-    #needed_for_turnin = needed_for_turnin_exp(robots,samples,ownedsamples)
     ownedknownsamples = [s for s in ownedsamples if s[4]!=-1]
-    needed_sequence = needed_for_sequence(robots,ownedknownsamples)
-    eprint(needed_sequence)
-    try_all_sequences(robots,samples,ownedknownsamples)
+
+
     
     if(robots[0][0] == 'LABORATORY' and turnin):
         eprint(turnin)
@@ -144,22 +251,6 @@ def stockupstrategy(robots,samples):
         order = getorder_turnin(robots,turnin[0])
         return(order)
         
-    #If we can assemble a sample we own, do it
-    
-    #blockmatrix,possible_block = blockable(robots,samples,enemysamples)
-    
-    #if(any(possible_block)):
-    #    order = getorder_retrievemolecules(robots,samples,)
-    #neededmatrix, possible_assemble_owned = immediately_collectable(robots,samples,ownedsamples)
-    
-    #eprint("neededmatrix")
-    #[eprint(n) for n in neededmatrix]
-    #eprint("possible",possible_assemble_owned)
-    
-    #if(any(possible_assemble_owned)):
-    #    to_assemble = ownedsamples[possible_assemble_owned.index(True)]
-    #    order = getorder_assemble(robots,samples,to_assemble)
-    #    return(order)
     
     neededmatrix,possible_assemble_cloud = immediately_collectable(robots,samples,cloudsamples)
     if(any(possible_assemble_cloud)):
@@ -174,13 +265,6 @@ def stockupstrategy(robots,samples):
             to_pickup = cloudsamples[possible_assemble_cloud.index(True)]
             order = "CONNECT " + str(to_pickup[0])
             return(order)
-    
-    #if we have undiagnosed samples, diagnose them
-    #getorder_diagnosenew(robots,samples)
-    
-    #If neither of these work, discard diagnose new samples
-    #order = getorder_diagnosenew(robots,samples)
-    '''
     if(robots[0][0] == "DIAGNOSIS"):
         if(len(ownedsamples)>0):
             order = "CONNECT " + str(ownedsamples[-1][0]) #dump worst sample
@@ -188,15 +272,8 @@ def stockupstrategy(robots,samples):
         else:
             order = "GOTO SAMPLES"
             return(order)
-    '''
-    if(len(ownedsamples)>0):
-        if(robots[0][0] == "DIAGNOSIS"):
-            order = "CONNECT " + str(ownedsamples[-1][0]) #dump worst sample
-            return(order)
-        else:
-            order = "GOTO DIAGNOSIS"
-            return(order)
-    if(len(ownedsamples)==0):
+        
+    if(len(ownedsamples)<3):
         order = getorder_newsamples(robots,samples)
         return(order)
 
@@ -418,8 +495,8 @@ def getorder_stockup(robots,samples):
     #eprint("TURN IN")
     for i,s in enumerate(ownedsamples):
         needed = np.maximum(s[5]-robots[0][4],0)
-        eprint("sample",s)
-        eprint("needed",needed)
+        #eprint("sample",s)
+        #eprint("needed",needed)
         if(s[4] == -1):
             continue
         if(all(needed<=unused_mol)):
@@ -475,7 +552,7 @@ def getorder_stockup(robots,samples):
         priority = np.array([1,2,0,3,4])
         order = getorder_getmolecule_bypriority(robots,samples,priority)
         return order
-    
+#
 def getorder_getmolecule_bypriority(robots,samples,priority):
     stock = getstock(robots)
     for i,p in enumerate(priority):
@@ -516,23 +593,56 @@ def getbest_turnin(robots,samples,candidate_samples):
 def needed_for_sequence(robots,samplesequence):
     tentative_exp = np.copy(robots[0][4])
     needed = np.array([0,0,0,0,0])
-    eprint("sequnece")
-    [eprint(s) for s in samplesequence]
+    #eprint("sequnece")
+    #[eprint(s) for s in samplesequence]
     for i,s in enumerate(samplesequence):
         needed += np.maximum(s[5]-tentative_exp,0)
         expgained = mti[s[3]] #molecule to int
         tentative_exp[expgained]+=1
-    eprint("tentexp",tentative_exp)    
-    eprint("needed",needed)
+    #eprint("tentexp",tentative_exp)    
+    #eprint("needed",needed)
     return needed
 
 #assumes the samples are diagnosed
-def try_all_sequences(robots,samples,candidate_samples):
-    
-    all_sequences = list(itertools.permutations(candidate_samples))
-    for i,seq in enumerate(all_sequences):    
-        needed_for_sequence(robots,seq)
-    return
+#Only callthis on a non-empty list of diagnosed samples.
+def try_all_sequences(projects,robots,samples,candidate_samples):
+    all_sequences = []
+    seqlength = min(len(candidate_samples),3)
+    while(seqlength>0):
+        all_sequences.extend(list(itertools.permutations(candidate_samples,seqlength)))
+        seqlength-=1
+
+    seq_info = []
+    for i,seq in enumerate(all_sequences):
+
+        total_needed = needed_for_sequence(robots,seq)
+        
+        mol_still_needed = np.maximum(total_needed-robots[0][3],0)
+        turns_to_complete = np.sum(mol_still_needed) + getdist(robots[0][0],'MOLECULES') + robots[0][1]
+        stock = getstock(robots)
+
+        room = np.sum(mol_still_needed)<=10-np.sum(robots[0][3])
+        available = all(mol_still_needed<=stock)
+        
+        if(room and available):
+            possible = True
+        else:
+            possible = False
+        seq_exp = np.copy(robots[0][4])
+        seq_score = robots[0][2]
+        for s in seq:
+            
+            
+            seq_exp[mti[s[3]]] += 1 #for each sample, convert mol to int, add to that index
+            seq_score += s[4]
+        for p in projects:
+            if(all(robots[0][4] < p) and all(seq_exp)>=p):
+                seq_score+=50
+            
+        seq_i = [possible, total_needed, mol_still_needed,seq_score,seq_exp,turns_to_complete,seq]
+        seq_info.append(seq_i)
+   
+    return seq_info
             
 def getorder_diagnosenew(robots,samples):
     ownedsamples = [s for s in samples if s[1] == 0]
@@ -594,6 +704,33 @@ def getorder_newsamples(robots,samples):
             elif(np.sum(robots[0][4])<9 and np.sum(robots[0][4])>=8):
                 desired = [2,2,3]
             else:#(np.sum(robots[0][4])>=8):
+                desired = [3,3,3]
+            desired = Counter(desired)
+            to_order = list((desired-currentranks).elements())
+            
+            order = "CONNECT " + str(to_order[-1])
+    return order
+def getorder_newsamples_conservative(robots,samples):
+    if (robots[0][0] != "SAMPLES"):
+        order = "GOTO SAMPLES"
+    else:
+        if(len([s for s in samples if s[1] == 0]) < 3):
+            #desired: the desired ranks 
+            currentranks = Counter([s[2] for s in samples if s[1] == 0])
+            if(np.sum(robots[0][4])<3):
+                desired = [1,1,1]
+            elif(np.sum(robots[0][4])<4 and np.sum(robots[0][4])>=3):
+                desired = [1,1,2]
+            elif(np.sum(robots[0][4])<6 and np.sum(robots[0][4])>=4):
+                desired = [1,1,2]
+            elif(np.sum(robots[0][4])<8 and np.sum(robots[0][4])>=6):
+                desired = [1,2,2]
+            elif(np.sum(robots[0][4])<9 and np.sum(robots[0][4])>=8):
+                desired = [2,2,2]
+            elif(np.sum(robots[0][4])<11 and np.sum(robots[0][4])>=9):
+                desired = [2,2,3]
+            else:#(np.sum(robots[0][4])>=8):
+                
                 desired = [3,3,3]
             desired = Counter(desired)
             to_order = list((desired-currentranks).elements())
